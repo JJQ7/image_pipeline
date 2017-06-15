@@ -68,6 +68,7 @@ class DisparityNodelet : public nodelet::Nodelet
   boost::shared_ptr<image_transport::ImageTransport> it_;
   
   // Subscriptions
+  int process_nth_frame_;
   image_transport::SubscriberFilter sub_l_image_, sub_r_image_;
   message_filters::Subscriber<CameraInfo> sub_l_info_, sub_r_info_;
   typedef ExactTime<Image, CameraInfo, Image, CameraInfo> ExactPolicy;
@@ -107,6 +108,9 @@ void DisparityNodelet::onInit()
 
   it_.reset(new image_transport::ImageTransport(nh));
 
+  process_nth_frame_ = 1;
+  private_nh.param<int>("process_nth_frame", process_nth_frame_, process_nth_frame_);
+
   // Synchronize inputs. Topic subscriptions happen on demand in the connection
   // callback. Optionally do approximate synchronization.
   int queue_size;
@@ -141,6 +145,9 @@ void DisparityNodelet::onInit()
   // Make sure we don't enter connectCb() between advertising and assigning to pub_disparity_
   boost::lock_guard<boost::mutex> lock(connect_mutex_);
   pub_disparity_ = nh.advertise<DisparityImage>("disparity", 1, connect_cb, connect_cb);
+  connect_mutex_.unlock();
+
+  NODELET_INFO("Initialisation Completted");
 }
 
 // Handles (un)subscribing when clients (un)subscribe
@@ -153,9 +160,11 @@ void DisparityNodelet::connectCb()
     sub_l_info_ .unsubscribe();
     sub_r_image_.unsubscribe();
     sub_r_info_ .unsubscribe();
+    NODELET_INFO("STOPPED Processing");
   }
   else if (!sub_l_image_.getSubscriber())
   {
+    NODELET_INFO("STARTING Processing");
     ros::NodeHandle &nh = getNodeHandle();
     // Queue size 1 should be OK; the one that matters is the synchronizer queue size.
     /// @todo Allow remapping left, right?
@@ -172,6 +181,13 @@ void DisparityNodelet::imageCb(const ImageConstPtr& l_image_msg,
                                const ImageConstPtr& r_image_msg,
                                const CameraInfoConstPtr& r_info_msg)
 {
+
+  //process only every process_nth_frame_ frame
+  if(l_image_msg->header.seq % process_nth_frame_ != 0 )
+  {
+    return;
+  }
+
   // Update the camera model
   model_.fromCameraInfo(l_info_msg, r_info_msg);
 
@@ -202,7 +218,8 @@ void DisparityNodelet::imageCb(const ImageConstPtr& l_image_msg,
   // Adjust for any x-offset between the principal points: d' = d - (cx_l - cx_r)
   double cx_l = model_.left().cx();
   double cx_r = model_.right().cx();
-  if (cx_l != cx_r) {
+  if (cx_l != cx_r)
+  {
     cv::Mat_<float> disp_image(disp_msg->image.height, disp_msg->image.width,
                               reinterpret_cast<float*>(&disp_msg->image.data[0]),
                               disp_msg->image.step);

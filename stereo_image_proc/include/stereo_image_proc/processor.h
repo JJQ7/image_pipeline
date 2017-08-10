@@ -34,6 +34,7 @@
 #ifndef STEREO_IMAGE_PROC_PROCESSOR_H
 #define STEREO_IMAGE_PROC_PROCESSOR_H
 
+#include <opencv2/cudastereo.hpp>
 #include <image_proc/processor.h>
 #include <image_geometry/stereo_camera_model.h>
 #include <stereo_msgs/DisparityImage.h>
@@ -60,6 +61,7 @@ public:
   {
     block_matcher_ = cv::StereoBM::create();
     sg_block_matcher_ = cv::StereoSGBM::create(1, 1, 10);
+    cuda_block_matcher_ = cv::cuda::createStereoBM();
 #else
     : block_matcher_(cv::StereoBM::BASIC_PRESET),
       sg_block_matcher_()
@@ -69,7 +71,7 @@ public:
 
   enum StereoType
   {
-    BM, SGBM
+    BM, SGBM, BM_CUDA
   };
 
   enum {
@@ -104,6 +106,9 @@ public:
   int getPreFilterSize() const;
   void setPreFilterSize(int size);
 
+  int getCudaPreFilterSize() const;
+  void setCudaPreFilterSize(int size);
+
   int getPreFilterCap() const;
   void setPreFilterCap(int cap);
 
@@ -122,6 +127,9 @@ public:
 
   int getTextureThreshold() const;
   void setTextureThreshold(int threshold);
+
+  int getCudaTextureThreshold() const;
+  void setCudaTextureThreshold(int threshold);
 
   float getUniquenessRatio() const;
   void setUniquenessRatio(float ratio);
@@ -171,6 +179,7 @@ private:
 #if CV_MAJOR_VERSION == 3
   mutable cv::Ptr<cv::StereoBM> block_matcher_; // contains scratch buffers for block matching
   mutable cv::Ptr<cv::StereoSGBM> sg_block_matcher_;
+  mutable cv::Ptr<cv::cuda::StereoBM> cuda_block_matcher_;
 #else
   mutable cv::StereoBM block_matcher_; // contains scratch buffers for block matching
   mutable cv::StereoSGBM sg_block_matcher_;
@@ -201,12 +210,16 @@ inline TYPE StereoProcessor::GET() const \
 { \
   if (current_stereo_algorithm_ == BM) \
     return block_matcher_.state->PARAM; \
-  return sg_block_matcher_.PARAM; \
+  else (current_stereo_algorithm_ == BM_CUDA) \
+    return cuda_block_matcher_.state->PARAM; \
+  else \
+    return sg_block_matcher_.PARAM; \
 } \
  \
 inline void StereoProcessor::SET(TYPE param) \
 { \
   block_matcher_.state->PARAM = param; \
+  cuda_block_matcher_.state->PARAM = param; \
   sg_block_matcher_.PARAM = param; \
 }
 
@@ -215,12 +228,15 @@ inline TYPE StereoProcessor::GET() const \
 { \
   if (current_stereo_algorithm_ == BM) \
     return block_matcher_->GET_OPENCV(); \
+  else if (current_stereo_algorithm_ == BM_CUDA) \
+    return cuda_block_matcher_->GET_OPENCV(); \
   return sg_block_matcher_->GET_OPENCV(); \
 } \
 \
 inline void StereoProcessor::SET(TYPE param) \
 { \
   block_matcher_->SET_OPENCV(param); \
+  cuda_block_matcher_->SET_OPENCV(param); \
   sg_block_matcher_->SET_OPENCV(param); \
 }
 
@@ -279,6 +295,8 @@ inline void StereoProcessor::SET(TYPE param) \
 #if CV_MAJOR_VERSION == 3
 STEREO_IMAGE_PROC_ONLY_OPENCV3(block_matcher_, getPreFilterSize, setPreFilterSize, int, getPreFilterSize, setPreFilterSize)
 STEREO_IMAGE_PROC_ONLY_OPENCV3(block_matcher_, getTextureThreshold, setTextureThreshold, int, getTextureThreshold, setTextureThreshold)
+STEREO_IMAGE_PROC_ONLY_OPENCV3(cuda_block_matcher_, getCudaPreFilterSize, setCudaPreFilterSize, int, getPreFilterSize, setPreFilterSize)
+STEREO_IMAGE_PROC_ONLY_OPENCV3(cuda_block_matcher_, getCudaTextureThreshold, setCudaTextureThreshold, int, getTextureThreshold, setTextureThreshold)
 #else
 STEREO_IMAGE_PROC_BM_ONLY_OPENCV2(getPreFilterSize, setPreFilterSize, int, preFilterSize)
 STEREO_IMAGE_PROC_BM_ONLY_OPENCV2(getTextureThreshold, setTextureThreshold, int, textureThreshold)

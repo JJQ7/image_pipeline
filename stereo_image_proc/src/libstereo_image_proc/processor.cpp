@@ -92,6 +92,8 @@ void StereoProcessor::processDisparity(const cv::Mat& left_rect, const cv::Mat& 
   if (current_stereo_algorithm_ == BM)
 #if CV_MAJOR_VERSION == 3
     block_matcher_->compute(left_rect, right_rect, disparity16_);
+  else if (current_stereo_algorithm_ == BM_CUDA)
+    cuda_block_matcher_->compute(left_rect, right_rect, disparity16_);
   else
     sg_block_matcher_->compute(left_rect, right_rect, disparity16_);
 #else

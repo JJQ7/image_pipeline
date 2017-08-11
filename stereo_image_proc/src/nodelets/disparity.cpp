@@ -230,16 +230,19 @@ void DisparityNodelet::configCb(Config &config, uint32_t level)
   block_matcher_.setSpeckleSize(config.speckle_size);
   block_matcher_.setSpeckleRange(config.speckle_range);
   if (config.stereo_algorithm == stereo_image_proc::Disparity_StereoBM) { // StereoBM
+      ROS_INFO("Setting matcher to Disparity_StereoBM");
     block_matcher_.setStereoType(StereoProcessor::BM);
     block_matcher_.setPreFilterSize(config.prefilter_size);
     block_matcher_.setTextureThreshold(config.texture_threshold);
   }
   else if (config.stereo_algorithm == stereo_image_proc::Disparity_StereoBM_CUDA) { // StereoBM
+      ROS_INFO("Setting matcher to Disparity_StereoBM_CUDA");
     block_matcher_.setStereoType(StereoProcessor::BM_CUDA);
     block_matcher_.setCudaPreFilterSize(config.prefilter_size);
     block_matcher_.setCudaTextureThreshold(config.texture_threshold);
   }
   else if (config.stereo_algorithm == stereo_image_proc::Disparity_StereoSGBM) { // StereoSGBM
+      ROS_INFO("Setting matcher to Disparity_StereoSGBM");
     block_matcher_.setStereoType(StereoProcessor::SGBM);
     block_matcher_.setSgbmMode(config.fullDP);
     block_matcher_.setP1(config.P1);

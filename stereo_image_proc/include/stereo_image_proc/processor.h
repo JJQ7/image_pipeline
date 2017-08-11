@@ -34,6 +34,7 @@
 #ifndef STEREO_IMAGE_PROC_PROCESSOR_H
 #define STEREO_IMAGE_PROC_PROCESSOR_H
 
+#include <ros/ros.h>
 #include <opencv2/cudastereo.hpp>
 #include <image_proc/processor.h>
 #include <image_geometry/stereo_camera_model.h>
@@ -56,18 +57,28 @@ class StereoProcessor
 {
 public:
   
-  StereoProcessor()
-#if CV_MAJOR_VERSION == 3
-  {
-    block_matcher_ = cv::StereoBM::create();
-    sg_block_matcher_ = cv::StereoSGBM::create(1, 1, 10);
-    cuda_block_matcher_ = cv::cuda::createStereoBM();
-#else
-    : block_matcher_(cv::StereoBM::BASIC_PRESET),
-      sg_block_matcher_()
-  {
-#endif
-  }
+    StereoProcessor()
+  #if CV_MAJOR_VERSION == 3
+
+    {
+      block_matcher_ = cv::StereoBM::create();
+      sg_block_matcher_ = cv::StereoSGBM::create(1, 1, 10);
+      cuda_block_matcher_ = cv::cuda::createStereoBM();
+  #else
+      : block_matcher_(cv::StereoBM::BASIC_PRESET),
+        sg_block_matcher_()
+    {
+  #endif
+    }
+
+    ~StereoProcessor()
+  #if CV_MAJOR_VERSION == 3
+    {
+      d_leftFrame.release();
+      d_rightFrame.release();
+      d_disparity.release();
+  #endif
+    }
 
   enum StereoType
   {
@@ -96,7 +107,11 @@ public:
   inline
   StereoType getStereoType() const {return current_stereo_algorithm_;}
   inline
-  void setStereoType(StereoType type) {current_stereo_algorithm_ = type;}
+  void setStereoType(StereoType type)
+  {
+      ROS_INFO_STREAM("Setting Stereo Type to :" << type);
+      current_stereo_algorithm_ = type;
+  }
 
   int getInterpolation() const;
   void setInterpolation(int interp);
@@ -180,6 +195,9 @@ private:
   mutable cv::Ptr<cv::StereoBM> block_matcher_; // contains scratch buffers for block matching
   mutable cv::Ptr<cv::StereoSGBM> sg_block_matcher_;
   mutable cv::Ptr<cv::cuda::StereoBM> cuda_block_matcher_;
+  mutable cv::cuda::GpuMat d_leftFrame;
+  mutable cv::cuda::GpuMat d_rightFrame;
+  mutable cv::cuda::GpuMat d_disparity;
 #else
   mutable cv::StereoBM block_matcher_; // contains scratch buffers for block matching
   mutable cv::StereoSGBM sg_block_matcher_;

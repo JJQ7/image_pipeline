@@ -91,11 +91,44 @@ void StereoProcessor::processDisparity(const cv::Mat& left_rect, const cv::Mat& 
   // Block matcher produces 16-bit signed (fixed point) disparity image
   if (current_stereo_algorithm_ == BM)
 #if CV_MAJOR_VERSION == 3
+  {
+       //ROS_INFO("Using block_matcher_ ");
     block_matcher_->compute(left_rect, right_rect, disparity16_);
+  }
   else if (current_stereo_algorithm_ == BM_CUDA)
-    cuda_block_matcher_->compute(left_rect, right_rect, disparity16_);
+  {
+      //ROS_INFO("Using cuda_block_matcher_ ");
+      d_leftFrame.create(left_rect.rows, left_rect.cols, left_rect.type());
+      d_rightFrame.create(right_rect.rows, right_rect.cols, right_rect.type());
+      d_disparity.create(disparity16_.rows, disparity16_.cols, disparity16_.type());
+      //ROS_INFO_STREAM("before gpu_type:" << d_disparity.type());
+      //ROS_INFO_STREAM("before cpu_type:" << disparity16_.type());
+
+      d_leftFrame.upload(left_rect);
+      d_rightFrame.upload(right_rect);
+
+      cuda_block_matcher_->compute(d_leftFrame, d_rightFrame, d_disparity);
+      if(d_disparity.empty())
+      {
+          ROS_INFO("Disparity is empty");
+      }
+      else
+      {
+         //ROS_INFO("Disparity is not empty... downloading");
+         //ROS_INFO_STREAM("gpu_type:" << d_disparity.type());
+         //ROS_INFO_STREAM("cpu_type:" << disparity16_.type());
+         cv::Mat tempM(d_disparity.size(), d_disparity.type());
+         d_disparity.download(tempM);
+         tempM.convertTo(disparity16_, disparity16_.type());
+
+      }
+
+  }
   else
+  {
+      //ROS_INFO("Using sg_block_matcher_ ");
     sg_block_matcher_->compute(left_rect, right_rect, disparity16_);
+  }
 #else
     block_matcher_(left_rect, right_rect, disparity16_);
   else
